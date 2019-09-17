@@ -1,0 +1,130 @@
+---
+title: "Practical Machine Learning Project"
+author: "Cody Coleman"
+date: "9/16/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###### Libraries
+
+```{r, Libraries}
+suppressWarnings(suppressMessages(library(ggplot2)))
+suppressWarnings(suppressMessages(library(caret)))
+suppressWarnings(suppressMessages(library(randomForest)))
+suppressWarnings(suppressMessages(library(e1071)))
+```
+
+## Summary
+
+#### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#### Tasks
+
+* Build a model.
+* Use Cross Validation.
+* What is the Out of Sample Error?
+* Explain why you made your choices.
+
+
+## Data
+
+#### Download
+```{r, Download}
+trainingdata <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings = c(NA, '', '#DIV/0!'))
+testdata <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+```
+
+#### Cleaning & Viewing
+```{r, ViewData, results = "hide"}
+names(trainingdata)
+names(testdata)
+
+trainingdata <- trainingdata[, colSums(is.na(trainingdata)) == 0]
+testdata <- testdata[, colSums(is.na(testdata)) == 0]
+ 
+dim(trainingdata)
+dim(testdata)
+
+head(trainingdata)
+```
+First, we must download the data. Then, clean the data if necessary. In this section we just took out any NA's, empty spaces, or '#DIV/0!'. These values could be seen by looking at the first few observations of each variable. After seeing these things, I used the na.strings function to make all of these values NAs, and then cleaned up the NAs as necessary. 
+
+In the next section, we will clean the data up to get it ready to be used in the prediction model. We rid ourselves of the first 7 variables since they have nothing to do with the prediction of the classe variable. d
+
+###### Get Data Ready for Training and Testing
+
+```{r, Readydata, results = 'hide'}
+trainingdata <- trainingdata[, -c(1:7)]
+testdata <- testdata[, -c(1:7)]
+
+head(trainingdata)
+```
+
+## Model
+
+```{r, SplitData}
+
+trainset <- createDataPartition(trainingdata$classe, p = .6, list = FALSE, times = 1)
+Trainset <- trainingdata[trainset, ]
+Testset <- trainingdata[-trainset, ]
+dim(trainset)
+dim(Testset)
+
+```
+
+First we must partition the set into a training set and a test set. Let's not get Testset and testdata confused here. The Testset variable is one made specifically for trying out this model. The following is the model. It takes quite a bit of time to run, so it might be better to it in parallel. This is not something that I am comfortable with, so for now, I'll allow it to take its time. The model is built using Cross Validation with Random Forests on 4 folds. 
+
+```{r, TheModel}
+
+trainingModel <- train(classe ~., 
+                       data = trainingdata, 
+                       method = 'rf', 
+                       metric = 'Accuracy',
+                       trControl = trainControl(method = 'cv',
+                                                number = 4,
+                                                p = .6))
+
+print(trainingModel)
+```
+
+We find that using the trainingdata, the traningModel is very accurate. 
+
+
+```{r, Prediction}
+
+PredictionTest <- predict(trainingModel, newdata = Testset)
+
+confusionMatrix(PredictionTest, Testset$classe)
+
+```
+We see here from the confustion matrix that the training model is 100% accurate based on the prediction of the Testset. This implies that there is no Out of Sample Error since the accuracy is 1. This does, at least in my opinion, throw up some red flags. How is this model 100% accurate? Have I made a mistake? Based on a littl digging, I can't seem to find any mistakes, so I can only assume that the model is correct until proven otherwise. 
+
+The following is the final model that has a OOB estimate of error rate of .43%. This is extremely low (as it should be based on the accuracy results from above). The number of variables tried at each split is 2, and the top 20 most important variables used in the data are listed below as well. 
+
+```{r, FinalModel}
+
+trainingModel$finalModel
+
+varImp(trainingModel)
+
+```
+
+This will be the final test using the testdata. It will give an extremely accurate prediction of what movements are made in the classe variable. 
+```{r, FinalTest}
+
+FinalTest <- predict(trainingModel, newdata = testdata)
+
+print(FinalTest)
+
+```
+
+
+
+
+
